@@ -1,24 +1,44 @@
 from flask import Flask, request, session
 import yfinance as yf
 import plotly.graph_objects as go
+import time
 
 app = Flask(__name__)
 app.secret_key = "change_this_to_any_random_string"
 
-# ---------------- AI STYLE EXPLANATION ----------------
-def ai_explain(info):
-    sector = info.get("sector", "Unknown")
+# ---------------- CACHE SYSTEM (FIX RATE LIMIT) ----------------
+cache = {}
+CACHE_TIME = 60  # seconds
 
+def get_stock(ticker):
+    now = time.time()
+
+    if ticker in cache:
+        data, timestamp = cache[ticker]
+        if now - timestamp < CACHE_TIME:
+            return data
+
+    stock = yf.Ticker(ticker)
+    info = stock.info
+    price = stock.fast_info.get("lastPrice", 0)
+
+    data = (stock, info, price)
+    cache[ticker] = (data, now)
+
+    return data
+
+# ---------------- AI EXPLANATION ----------------
+def ai_explain(sector):
     if sector == "Technology":
         return "Tech stock: high growth, high volatility, innovation-driven."
     elif sector == "Consumer Cyclical":
-        return "Cyclical stock: depends on economy and consumer spending."
+        return "Cyclical stock: depends on economy and spending."
     elif sector == "Financial Services":
         return "Financial stock: affected by interest rates and banking cycles."
     elif sector == "Energy":
-        return "Energy stock: tied to oil, gas, and global demand."
+        return "Energy stock: tied to oil, gas, global demand."
     else:
-        return "Mixed sector: behavior depends on broader market conditions."
+        return "Mixed sector: market-driven behavior."
 
 # ---------------- FORMAT MONEY ----------------
 def fmt(num):
@@ -35,7 +55,7 @@ def fmt(num):
     except:
         return "N/A"
 
-# ---------------- MAIN APP ----------------
+# ---------------- ROUTE ----------------
 @app.route("/", methods=["GET", "POST"])
 def home():
 
@@ -45,17 +65,16 @@ def home():
 
     action = request.form.get("action") if request.method == "POST" else None
 
-    # ---------------- SEARCH STOCK ----------------
+    # ---------------- SEARCH ----------------
     if action == "search":
 
         ticker = request.form["ticker"].upper()
 
         try:
-            stock = yf.Ticker(ticker)
-            info = stock.info
+            stock, info, price = get_stock(ticker)
 
-            price = stock.fast_info.get("lastPrice", 0)
             company = info.get("longName", ticker)
+            sector = info.get("sector", "Unknown")
 
             hist_1m = stock.history(period="1mo")
             hist_6m = stock.history(period="6mo")
@@ -74,20 +93,20 @@ def home():
             fig2.update_layout(template="plotly_dark", height=300)
             chart2 = fig2.to_html(full_html=False)
 
-            ai = ai_explain(info)
+            ai = ai_explain(sector)
 
             result = f"""
             <div class="card">
                 <h2>{company}</h2>
                 <h3>{ticker}</h3>
 
-                <h2>Price: ${price}</h2>
+                <h2>💰 Price: ${price}</h2>
 
                 <p>{ai}</p>
 
                 <hr>
 
-                <p><b>Sector:</b> {info.get('sector','N/A')}</p>
+                <p><b>Sector:</b> {sector}</p>
                 <p><b>Industry:</b> {info.get('industry','N/A')}</p>
                 <p><b>Country:</b> {info.get('country','N/A')}</p>
 
@@ -97,15 +116,15 @@ def home():
 
                 <hr>
 
-                <h3>1 Month Chart</h3>
+                <h3>📈 1 Month Chart</h3>
                 {chart1}
 
-                <h3>6 Month Chart</h3>
+                <h3>📊 6 Month Chart</h3>
                 {chart2}
 
                 <form method="POST">
                     <input type="hidden" name="ticker" value="{ticker}">
-                    <button name="action" value="add_watchlist">Add to Watchlist</button>
+                    <button name="action" value="add_watchlist">❤️ Add Watchlist</button>
                 </form>
             </div>
             """
@@ -141,7 +160,7 @@ def home():
 
         compare_chart = f"""
         <div class="card">
-            <h3>Comparison</h3>
+            <h3>📊 Comparison</h3>
             {fig.to_html(full_html=False)}
         </div>
         """
@@ -204,7 +223,7 @@ button {{
 
 <div class="container">
 
-<h1>Stock App Pro</h1>
+<h1>🚀 STOCK APP PRO</h1>
 
 <form method="POST">
     <input name="ticker" placeholder="NVDA, TSLA, AAPL">
@@ -218,7 +237,7 @@ button {{
 </form>
 
 <div class="watchlist">
-<h3>Watchlist</h3>
+<h3>❤️ Watchlist</h3>
 {watch_html}
 </div>
 
@@ -232,6 +251,6 @@ button {{
 </html>
 """
 
-# ---------------- RUN SERVER ----------------
+# ---------------- RUN ----------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
