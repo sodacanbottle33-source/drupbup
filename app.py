@@ -6,7 +6,7 @@ import os
 
 app = Flask(__name__)
 
-# ---------------- SECURE API KEY (FROM RENDER ENV) ----------------
+# ---------------- SECURE API KEY ----------------
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 
 # ---------------- GET PRICE ----------------
@@ -18,7 +18,7 @@ def get_price(ticker):
         price = 0
     return price, stock
 
-# ---------------- GET COMPANY INFO (REAL API) ----------------
+# ---------------- REAL COMPANY DATA ----------------
 def get_company_data(ticker):
 
     if not FMP_API_KEY:
@@ -49,10 +49,7 @@ def home():
         ticker = request.form["ticker"].upper()
 
         try:
-            # PRICE + STOCK DATA
             price, stock = get_price(ticker)
-
-            # API DATA
             info = get_company_data(ticker)
 
             company = info.get("companyName") or ticker
@@ -67,28 +64,19 @@ def home():
 
             fig1 = go.Figure()
             if not hist_1m.empty:
-                fig1.add_trace(go.Scatter(
-                    x=hist_1m.index,
-                    y=hist_1m["Close"],
-                    name="1 Month"
-                ))
+                fig1.add_trace(go.Scatter(x=hist_1m.index, y=hist_1m["Close"], name="1M"))
             fig1.update_layout(template="plotly_dark", height=300)
             chart1 = fig1.to_html(full_html=False)
 
             fig2 = go.Figure()
             if not hist_6m.empty:
-                fig2.add_trace(go.Scatter(
-                    x=hist_6m.index,
-                    y=hist_6m["Close"],
-                    name="6 Month"
-                ))
+                fig2.add_trace(go.Scatter(x=hist_6m.index, y=hist_6m["Close"], name="6M"))
             fig2.update_layout(template="plotly_dark", height=300)
             chart2 = fig2.to_html(full_html=False)
 
             # ---------------- UI ----------------
             result = f"""
-            <div style="margin-top:20px; padding:20px; background:#1e293b; border-radius:12px; text-align:left;">
-
+            <div class="card">
                 <h2>🚀 {company}</h2>
                 <h3>{ticker}</h3>
 
@@ -108,7 +96,6 @@ def home():
 
                 <h3>📊 6 Month Chart</h3>
                 {chart2}
-
             </div>
             """
 
@@ -130,10 +117,14 @@ body {{
     text-align:center;
 }}
 
-.container {{
-    width:900px;
-    margin:auto;
+.card {{
+    background:#1e293b;
     padding:20px;
+    margin:auto;
+    margin-top:20px;
+    width:900px;
+    border-radius:12px;
+    text-align:left;
 }}
 
 input {{
@@ -155,8 +146,6 @@ button {{
 
 <body>
 
-<div class="container">
-
 <h1>🚀 PRO STOCK APP</h1>
 
 <form method="POST">
@@ -165,8 +154,6 @@ button {{
 </form>
 
 {result}
-
-</div>
 
 </body>
 </html>
