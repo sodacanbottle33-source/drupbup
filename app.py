@@ -1,39 +1,33 @@
 from flask import Flask, request
 import yfinance as yf
 import plotly.graph_objects as go
-import time
+import requests
 
 app = Flask(__name__)
 
-# ---------------- CACHE (FIX RATE LIMIT) ----------------
-cache = {}
-CACHE_TIME = 300  # 5 minutes
+# ---------------- CONFIG ----------------
+FMP_API_KEY = "PUT_YOUR_API_KEY_HERE"
 
-def get_stock(ticker):
-    now = time.time()
-
-    if ticker in cache:
-        data, timestamp = cache[ticker]
-        if now - timestamp < CACHE_TIME:
-            return data
-
+# ---------------- GET PRICE (YFINANCE) ----------------
+def get_price(ticker):
     stock = yf.Ticker(ticker)
-
-    # safe fetch (Yahoo can fail sometimes)
-    try:
-        info = stock.info
-    except:
-        info = {}
-
     try:
         price = stock.fast_info.get("lastPrice", 0)
     except:
         price = 0
+    return price, stock
 
-    data = (stock, info, price)
-    cache[ticker] = (data, now)
-
-    return data
+# ---------------- REAL COMPANY DATA (PRO API) ----------------
+def get_company_data(ticker):
+    url = f"https://financialmodelingprep.com/api/v3/profile/{ticker}?apikey={FMP_API_KEY}"
+    try:
+        r = requests.get(url, timeout=5)
+        data = r.json()
+        if data:
+            return data[0]
+    except:
+        pass
+    return {}
 
 # ---------------- HOME ----------------
 @app.route("/", methods=["GET", "POST"])
@@ -46,13 +40,17 @@ def home():
         ticker = request.form["ticker"].upper()
 
         try:
-            stock, info, price = get_stock(ticker)
+            # PRICE + STOCK OBJECT
+            price, stock = get_price(ticker)
 
-            # ---------------- SAFE DATA HANDLING ----------------
-            company = info.get("longName") or info.get("shortName") or ticker
+            # API COMPANY INFO
+            info = get_company_data(ticker)
+
+            company = info.get("companyName") or ticker
             sector = info.get("sector") or "Unknown"
             industry = info.get("industry") or "N/A"
             country = info.get("country") or "N/A"
+            market_cap = info.get("mktCap") or "N/A"
 
             # ---------------- CHARTS ----------------
             hist_1m = stock.history(period="1mo")
@@ -60,20 +58,28 @@ def home():
 
             fig1 = go.Figure()
             if not hist_1m.empty:
-                fig1.add_trace(go.Scatter(x=hist_1m.index, y=hist_1m["Close"], name="1M"))
+                fig1.add_trace(go.Scatter(
+                    x=hist_1m.index,
+                    y=hist_1m["Close"],
+                    name="1 Month"
+                ))
             fig1.update_layout(template="plotly_dark", height=300)
             chart1 = fig1.to_html(full_html=False)
 
             fig2 = go.Figure()
             if not hist_6m.empty:
-                fig2.add_trace(go.Scatter(x=hist_6m.index, y=hist_6m["Close"], name="6M"))
+                fig2.add_trace(go.Scatter(
+                    x=hist_6m.index,
+                    y=hist_6m["Close"],
+                    name="6 Month"
+                ))
             fig2.update_layout(template="plotly_dark", height=300)
             chart2 = fig2.to_html(full_html=False)
 
-            # ---------------- RESULT UI ----------------
+            # ---------------- UI ----------------
             result = f"""
             <div class="card">
-                <h2>{company}</h2>
+                <h2>🚀 {company}</h2>
                 <h3>{ticker}</h3>
 
                 <h2>💰 Price: ${price}</h2>
@@ -83,6 +89,7 @@ def home():
                 <p><b>Sector:</b> {sector}</p>
                 <p><b>Industry:</b> {industry}</p>
                 <p><b>Country:</b> {country}</p>
+                <p><b>Market Cap:</b> {market_cap}</p>
 
                 <hr>
 
@@ -101,7 +108,7 @@ def home():
 <!DOCTYPE html>
 <html>
 <head>
-<title>Stock App Pro</title>
+<title>PRO STOCK APP</title>
 
 <style>
 body {{
@@ -147,10 +154,10 @@ button {{
 
 <div class="container">
 
-<h1>🚀 STOCK APP PRO (STABLE)</h1>
+<h1>🚀 PRO STOCK APP (REAL API VERSION)</h1>
 
 <form method="POST">
-    <input name="ticker" placeholder="NVDA, TSLA, AAPL, BTC-USD">
+    <input name="ticker" placeholder="NVDA, TSLA, AAPL">
     <button type="submit">Search</button>
 </form>
 
