@@ -1,14 +1,13 @@
-from flask import Flask, request, session
+from flask import Flask, request
 import yfinance as yf
 import plotly.graph_objects as go
 import time
 
 app = Flask(__name__)
-app.secret_key = "change_this_to_something_random"
 
 # ---------------- CACHE (FIX RATE LIMIT) ----------------
 cache = {}
-CACHE_TIME = 300  # 5 minutes (important fix)
+CACHE_TIME = 300  # 5 minutes
 
 def get_stock(ticker):
     now = time.time()
@@ -20,7 +19,7 @@ def get_stock(ticker):
 
     stock = yf.Ticker(ticker)
 
-    # safer API calls (prevents crashing)
+    # safe fetch (Yahoo can fail sometimes)
     try:
         info = stock.info
     except:
@@ -36,40 +35,26 @@ def get_stock(ticker):
 
     return data
 
-# ---------------- AI EXPLANATION ----------------
-def ai_explain(sector):
-    if sector == "Technology":
-        return "Tech stock: high growth, high volatility, innovation-driven."
-    elif sector == "Consumer Cyclical":
-        return "Cyclical stock: depends on economy and spending."
-    elif sector == "Financial Services":
-        return "Financial stock: affected by interest rates and banking cycles."
-    elif sector == "Energy":
-        return "Energy stock: tied to oil, gas, global demand."
-    else:
-        return "Mixed sector: market-driven behavior."
-
-# ---------------- HOME ROUTE ----------------
+# ---------------- HOME ----------------
 @app.route("/", methods=["GET", "POST"])
 def home():
 
     result = ""
 
-    action = request.form.get("action") if request.method == "POST" else None
-
-    if action == "search":
+    if request.method == "POST":
 
         ticker = request.form["ticker"].upper()
 
         try:
             stock, info, price = get_stock(ticker)
 
-            company = info.get("longName", ticker)
-            sector = info.get("sector", "Unknown")
+            # ---------------- SAFE DATA HANDLING ----------------
+            company = info.get("longName") or info.get("shortName") or ticker
+            sector = info.get("sector") or "Unknown"
+            industry = info.get("industry") or "N/A"
+            country = info.get("country") or "N/A"
 
-            ai = ai_explain(sector)
-
-            # charts
+            # ---------------- CHARTS ----------------
             hist_1m = stock.history(period="1mo")
             hist_6m = stock.history(period="6mo")
 
@@ -85,6 +70,7 @@ def home():
             fig2.update_layout(template="plotly_dark", height=300)
             chart2 = fig2.to_html(full_html=False)
 
+            # ---------------- RESULT UI ----------------
             result = f"""
             <div class="card">
                 <h2>{company}</h2>
@@ -92,13 +78,11 @@ def home():
 
                 <h2>💰 Price: ${price}</h2>
 
-                <p>{ai}</p>
-
                 <hr>
 
                 <p><b>Sector:</b> {sector}</p>
-                <p><b>Industry:</b> {info.get('industry','N/A')}</p>
-                <p><b>Country:</b> {info.get('country','N/A')}</p>
+                <p><b>Industry:</b> {industry}</p>
+                <p><b>Country:</b> {country}</p>
 
                 <hr>
 
@@ -117,7 +101,7 @@ def home():
 <!DOCTYPE html>
 <html>
 <head>
-<title>Stock App Pro Fixed</title>
+<title>Stock App Pro</title>
 
 <style>
 body {{
@@ -163,11 +147,11 @@ button {{
 
 <div class="container">
 
-<h1>🚀 STOCK APP PRO (FIXED)</h1>
+<h1>🚀 STOCK APP PRO (STABLE)</h1>
 
 <form method="POST">
-    <input name="ticker" placeholder="NVDA, TSLA, AAPL">
-    <button name="action" value="search">Search</button>
+    <input name="ticker" placeholder="NVDA, TSLA, AAPL, BTC-USD">
+    <button type="submit">Search</button>
 </form>
 
 {result}
