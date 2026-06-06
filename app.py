@@ -6,7 +6,7 @@ import os
 
 app = Flask(__name__)
 
-# ---------------- SECURE API KEY ----------------
+# ---------------- SECURE API KEY (FROM RENDER ENV) ----------------
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 
 # ---------------- GET PRICE ----------------
@@ -18,7 +18,7 @@ def get_price(ticker):
         price = 0
     return price, stock
 
-# ---------------- REAL COMPANY DATA ----------------
+# ---------------- GET COMPANY DATA ----------------
 def get_company_data(ticker):
 
     if not FMP_API_KEY:
@@ -49,7 +49,10 @@ def home():
         ticker = request.form["ticker"].upper()
 
         try:
+            # PRICE + STOCK DATA
             price, stock = get_price(ticker)
+
+            # API DATA
             info = get_company_data(ticker)
 
             company = info.get("companyName") or ticker
@@ -64,13 +67,21 @@ def home():
 
             fig1 = go.Figure()
             if not hist_1m.empty:
-                fig1.add_trace(go.Scatter(x=hist_1m.index, y=hist_1m["Close"], name="1M"))
+                fig1.add_trace(go.Scatter(
+                    x=hist_1m.index,
+                    y=hist_1m["Close"],
+                    name="1 Month"
+                ))
             fig1.update_layout(template="plotly_dark", height=300)
             chart1 = fig1.to_html(full_html=False)
 
             fig2 = go.Figure()
             if not hist_6m.empty:
-                fig2.add_trace(go.Scatter(x=hist_6m.index, y=hist_6m["Close"], name="6M"))
+                fig2.add_trace(go.Scatter(
+                    x=hist_6m.index,
+                    y=hist_6m["Close"],
+                    name="6 Month"
+                ))
             fig2.update_layout(template="plotly_dark", height=300)
             chart2 = fig2.to_html(full_html=False)
 
