@@ -2,13 +2,14 @@ from flask import Flask, request
 import yfinance as yf
 import plotly.graph_objects as go
 import requests
+import os
 
 app = Flask(__name__)
 
-# ---------------- CONFIG ----------------
-FMP_API_KEY = "PUT_YOUR_API_KEY_HERE"
+# ---------------- SECURE API KEY (FROM RENDER ENV) ----------------
+FMP_API_KEY = os.getenv("FMP_API_KEY")
 
-# ---------------- GET PRICE (YFINANCE) ----------------
+# ---------------- GET PRICE ----------------
 def get_price(ticker):
     stock = yf.Ticker(ticker)
     try:
@@ -17,16 +18,24 @@ def get_price(ticker):
         price = 0
     return price, stock
 
-# ---------------- REAL COMPANY DATA (PRO API) ----------------
+# ---------------- GET COMPANY INFO (REAL API) ----------------
 def get_company_data(ticker):
+
+    if not FMP_API_KEY:
+        return {}
+
     url = f"https://financialmodelingprep.com/api/v3/profile/{ticker}?apikey={FMP_API_KEY}"
+
     try:
         r = requests.get(url, timeout=5)
         data = r.json()
-        if data:
+
+        if isinstance(data, list) and len(data) > 0:
             return data[0]
+
     except:
         pass
+
     return {}
 
 # ---------------- HOME ----------------
@@ -40,10 +49,10 @@ def home():
         ticker = request.form["ticker"].upper()
 
         try:
-            # PRICE + STOCK OBJECT
+            # PRICE + STOCK DATA
             price, stock = get_price(ticker)
 
-            # API COMPANY INFO
+            # API DATA
             info = get_company_data(ticker)
 
             company = info.get("companyName") or ticker
@@ -78,7 +87,8 @@ def home():
 
             # ---------------- UI ----------------
             result = f"""
-            <div class="card">
+            <div style="margin-top:20px; padding:20px; background:#1e293b; border-radius:12px; text-align:left;">
+
                 <h2>🚀 {company}</h2>
                 <h3>{ticker}</h3>
 
@@ -98,11 +108,12 @@ def home():
 
                 <h3>📊 6 Month Chart</h3>
                 {chart2}
+
             </div>
             """
 
         except Exception as e:
-            result = f"<div class='card'>Error: {e}</div>"
+            result = f"<div style='color:red;'>Error: {e}</div>"
 
     return f"""
 <!DOCTYPE html>
@@ -112,39 +123,31 @@ def home():
 
 <style>
 body {{
-    margin: 0;
-    font-family: Arial;
-    background: #0b1220;
-    color: white;
-    text-align: center;
+    margin:0;
+    font-family:Arial;
+    background:#0b1220;
+    color:white;
+    text-align:center;
 }}
 
 .container {{
-    width: 900px;
-    margin: auto;
-    padding: 20px;
-}}
-
-.card {{
-    background: #1e293b;
-    padding: 20px;
-    margin-top: 20px;
-    border-radius: 12px;
-    text-align: left;
+    width:900px;
+    margin:auto;
+    padding:20px;
 }}
 
 input {{
-    padding: 10px;
-    margin: 5px;
-    border-radius: 8px;
-    border: none;
+    padding:10px;
+    border-radius:8px;
+    border:none;
+    width:200px;
 }}
 
 button {{
-    padding: 10px;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
+    padding:10px;
+    border-radius:8px;
+    border:none;
+    cursor:pointer;
 }}
 </style>
 
@@ -154,10 +157,10 @@ button {{
 
 <div class="container">
 
-<h1>🚀 PRO STOCK APP (REAL API VERSION)</h1>
+<h1>🚀 PRO STOCK APP</h1>
 
 <form method="POST">
-    <input name="ticker" placeholder="NVDA, TSLA, AAPL">
+    <input name="ticker" placeholder="NVDA, AAPL, TSLA">
     <button type="submit">Search</button>
 </form>
 
